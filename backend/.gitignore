@@ -1,0 +1,6 @@
+.env
+/vendor
+/storage/*.key
+/bootstrap/cache/*
+!/bootstrap/cache/.gitignore
+/database/*.sqlite
