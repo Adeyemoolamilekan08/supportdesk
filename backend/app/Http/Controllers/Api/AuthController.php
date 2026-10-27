@@ -4,7 +4,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Company;
 use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
+// use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -31,16 +32,53 @@ class AuthController extends Controller {
         });
         return response()->json(['user'=>$user->load('company:id,name,slug'),'token'=>$user->createToken('supportdesk-web')->plainTextToken], 201);
     }
-    public function login(Request $request) {
-        $data = $request->validate(['email'=>'required|email','password'=>'required|string']);
-        if (!Auth::attempt($data)) throw ValidationException::withMessages(['email'=>['The supplied credentials are incorrect.']]);
-        $user = User::where('email',$data['email'])->firstOrFail();
-        if ($user->status !== 'active' || ($user->company && $user->company->status !== 'active')) {
-            Auth::logout();
-            return response()->json(['message'=>'This account is inactive. Contact your administrator.'], 403);
-        }
-        return response()->json(['user'=>$user->load('company:id,name,slug'),'token'=>$user->createToken('supportdesk-web')->plainTextToken]);
+
+    // public function login(Request $request) {
+    //     $data = $request->validate(['email'=>'required|email','password'=>'required|string']);
+    //     if (!Auth::attempt($data)) throw ValidationException::withMessages(['email'=>['The supplied credentials are incorrect.']]);
+    //     $user = User::where('email',$data['email'])->firstOrFail();
+    //     if ($user->status !== 'active' || ($user->company && $user->company->status !== 'active')) {
+    //         Auth::logout();
+    //         return response()->json(['message'=>'This account is inactive. Contact your administrator.'], 403);
+    //     }
+    //     return response()->json(['user'=>$user->load('company:id,name,slug'),'token'=>$user->createToken('supportdesk-web')->plainTextToken]);
+    // }
+
+    
+public function login(Request $request)
+{
+    $data = $request->validate([
+        'email' => 'required|email',
+        'password' => 'required|string',
+    ]);
+
+    $user = User::where('email', $data['email'])->first();
+
+    if (!$user || !Hash::check($data['password'], $user->password)) {
+        throw ValidationException::withMessages([
+            'email' => ['The supplied credentials are incorrect.'],
+        ]);
     }
+
+    if (
+        $user->status !== 'active' ||
+        ($user->company && $user->company->status !== 'active')
+    ) {
+        return response()->json([
+            'message' => 'This account is inactive. Contact your administrator.',
+        ], 403);
+    }
+
+    $token = $user->createToken('supportdesk-web')->plainTextToken;
+
+    return response()->json([
+        'user' => $user->load('company:id,name,slug'),
+        'token' => $token,
+    ]);
+}
+
+
+
     public function me(Request $request) { return response()->json(['user'=>$request->user()->load('company:id,name,slug')]); }
     public function logout(Request $request) { $request->user()->currentAccessToken()?->delete(); return response()->json(['message'=>'Logged out successfully.']); }
 }
